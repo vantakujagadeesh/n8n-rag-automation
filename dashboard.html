@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoRAG — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--surface:#13131a;--card:#1a1a26;--border:#2a2a3d;
+  --accent:#6c63ff;--accent2:#00d4ff;--green:#00e5a0;--red:#ff4d6d;
+  --yellow:#ffd166;--text:#e8e8f0;--muted:#8888aa;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+/* Sidebar */
+.layout{display:grid;grid-template-columns:240px 1fr;height:100vh}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:0}
+.logo{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-text{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav{padding:16px 10px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:14px;font-weight:500;margin-bottom:4px;transition:.2s}
+.nav-item:hover,.nav-item.active{background:rgba(108,99,255,.15);color:var(--accent)}
+.nav-item .icon{font-size:18px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:auto;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* Main */
+.main{overflow-y:auto;background:var(--bg)}
+.topbar{padding:20px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.topbar h1{font-size:20px;font-weight:600}
+.badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge.ok{background:rgba(0,229,160,.15);color:var(--green)}
+.badge.warn{background:rgba(255,209,102,.15);color:var(--yellow)}
+.content{padding:32px}
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:32px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;position:relative;overflow:hidden;transition:.3s}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.blue::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.stat-card.green::before{background:var(--green)}
+.stat-card.yellow::before{background:var(--yellow)}
+.stat-card.red::before{background:var(--red)}
+.stat-label{font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.stat-value{font-size:32px;font-weight:700;margin-bottom:4px}
+.stat-sub{font-size:13px;color:var(--muted)}
+/* Panels */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+.panel-title{font-size:15px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+/* Query box */
+.query-section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px}
+.input-row{display:flex;gap:12px;margin-bottom:16px}
+.query-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text);font-size:14px;outline:none;transition:.2s}
+.query-input:focus{border-color:var(--accent)}
+.btn{padding:12px 20px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:600;transition:.2s}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text)}
+.answer-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;min-height:100px;font-size:14px;line-height:1.7;color:var(--muted)}
+.answer-box.has-answer{color:var(--text)}
+/* Source chips */
+.sources{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.source-chip{background:rgba(108,99,255,.15);border:1px solid rgba(108,99,255,.3);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--accent)}
+/* Ingest drop */
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:.2s}
+.drop-zone:hover{border-color:var(--accent);background:rgba(108,99,255,.05)}
+.drop-icon{font-size:40px;margin-bottom:12px}
+.drop-text{font-size:14px;color:var(--muted)}
+/* Health */
+.health-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.health-row:last-child{border-bottom:none}
+.health-name{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.health-badge{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.health-badge.ok{background:rgba(0,229,160,.15);color:var(--green)}
+.health-badge.err{background:rgba(255,77,109,.15);color:var(--red)}
+.health-latency{font-size:12px;color:var(--muted)}
+/* Documents table */
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)}
+.table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.table tr:hover td{background:rgba(255,255,255,.02)}
+.file-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.file-badge.pdf{background:rgba(255,77,109,.15);color:var(--red)}
+.file-badge.docx{background:rgba(0,212,255,.15);color:var(--accent2)}
+.file-badge.url{background:rgba(0,229,160,.15);color:var(--green)}
+/* Spinner */
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading .spinner{display:inline-block}
+/* Chart bar */
+.chart{display:flex;align-items:flex-end;gap:6px;height:80px;margin-top:12px}
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--accent),var(--accent2));transition:1.2s}
+.bar-label{font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="layout">
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <span class="logo-text">AutoRAG</span>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="show('dashboard')"><span class="icon">📊</span>Dashboard<div class="status-dot"></div></div>
+    <div class="nav-item" onclick="show('query')"><span class="icon">🔍</span>Query</div>
+    <div class="nav-item" onclick="show('ingest')"><span class="icon">📤</span>Ingest</div>
+    <div class="nav-item" onclick="show('documents')"><span class="icon">📄</span>Documents</div>
+    <div class="nav-item" onclick="show('health')"><span class="icon">💚</span>Health</div>
+  </nav>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span id="api-badge" class="badge warn">⚠ API keys needed</span>
+      <span style="font-size:13px;color:var(--muted)">v1.0.0</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard">
+      <div class="stats">
+        <div class="stat-card blue"><div class="stat-label">Documents</div><div class="stat-value" id="s-docs">—</div><div class="stat-sub">in knowledge base</div></div>
+        <div class="stat-card green"><div class="stat-label">Chunks</div><div class="stat-value" id="s-chunks">—</div><div class="stat-sub">stored in Qdrant</div></div>
+        <div class="stat-card yellow"><div class="stat-label">Queries (7d)</div><div class="stat-value" id="s-queries">—</div><div class="stat-sub">avg latency: <span id="s-lat">—</span>ms</div></div>
+        <div class="stat-card red"><div class="stat-label">Embedding Dims</div><div class="stat-value">3072</div><div class="stat-sub">text-embedding-3-large</div></div>
+      </div>
+
+      <div class="panels">
+        <div class="panel">
+          <div class="panel-title">⚡ Pipeline Architecture</div>
+          <div style="font-size:13px;line-height:2;color:var(--muted)">
+            📤 <b style="color:var(--text)">Ingest:</b> Upload PDF/DOCX/URL<br>
+            ✂️ <b style="color:var(--text)">Chunk:</b> 512 tokens / 50 overlap<br>
+            🧠 <b style="color:var(--text)">Embed:</b> text-embedding-3-large<br>
+            🔁 <b style="color:var(--text)">Dedup:</b> SHA-256 via Redis<br>
+            🗄️ <b style="color:var(--text)">Store:</b> Qdrant + PostgreSQL<br>
+            <br>
+            🔍 <b style="color:var(--text)">Query:</b> HyDE expansion → Hybrid search<br>
+            🏆 <b style="color:var(--text)">Rerank:</b> Cross-encoder top-20 → top-5<br>
+            💬 <b style="color:var(--text)">Answer:</b> GPT-4o → cited response
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">📈 Query Volume (7 days)</div>
+          <div class="chart" id="chart">
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="40"></div><div class="bar-label">Mon</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="65"></div><div class="bar-label">Tue</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="30"></div><div class="bar-label">Wed</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="80"></div><div class="bar-label">Thu</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="55"></div><div class="bar-label">Fri</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="70"></div><div class="bar-label">Sat</div></div>
+            <div class="bar-wrap"><div class="bar" style="height:0%" data-h="90"></div><div class="bar-label">Sun</div></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:12px">Connect to <code style="color:var(--accent)">localhost:8000</code> to see live data</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">🚀 Quick Start</div>
+        <div style="font-size:13px;line-height:2;color:var(--muted)">
+          1. Fill in your API keys in <code style="color:var(--accent)">autorag/.env</code><br>
+          2. Run: <code style="color:var(--accent2)">cd autorag && uvicorn app.main:app --reload --port 8000</code><br>
+          3. Swagger UI: <a href="http://localhost:8000/docs" target="_blank" style="color:var(--accent)">http://localhost:8000/docs</a><br>
+          4. This dashboard connects automatically when server is live
+        </div>
+      </div>
+    </div>
+
+    <!-- QUERY -->
+    <div id="view-query" style="display:none">
+      <div class="query-section">
+        <div class="panel-title" style="margin-bottom:16px">🔍 Ask Your Knowledge Base</div>
+        <div class="input-row">
+          <input class="query-input" id="q-input" placeholder="e.g. What is the company refund policy?" onkeydown="if(event.key==='Enter')runQuery()">
+          <select class="query-input" id="q-topk" style="flex:0 0 100px">
+            <option value="3">Top 3</option>
+            <option value="5" selected>Top 5</option>
+            <option value="10">Top 10</option>
+          </select>
+          <button class="btn btn-primary" onclick="runQuery()">
+            <span id="q-spinner" class="spinner"></span>
+            <span id="q-btn-text">Ask ⚡</span>
+          </button>
+        </div>
+        <div class="answer-box" id="q-answer">Your answer will appear here. Start the AutoRAG server first: <code>uvicorn app.main:app --reload --port 8000</code></div>
+        <div class="sources" id="q-sources"></div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted)" id="q-meta"></div>
+      </div>
+    </div>
+
+    <!-- INGEST -->
+    <div id="view-ingest" style="display:none">
+      <div class="query-section">
+        <div class="panel-title" style="margin-bottom:16px">📤 Ingest Document</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <div class="drop-zone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+              <div class="drop-icon">📁</div>
+              <div class="drop-text">Drop PDF or DOCX here<br>or click to browse</div>
+              <input type="file" id="file-input" accept=".pdf,.docx" style="display:none" onchange="ingestFile(this.files[0])">
+            </div>
+            <div id="ingest-status" style="margin-top:12px;font-size:13px;color:var(--muted)"></div>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:12px">Or ingest from URL</div>
+            <input class="query-input" id="url-input" placeholder="https://example.com/doc.pdf" style="width:100%;margin-bottom:12px">
+            <button class="btn btn-primary" style="width:100%" onclick="ingestUrl()">Ingest URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCUMENTS -->
+    <div id="view-documents" style="display:none">
+      <div class="panel">
+        <div class="panel-title">📄 Ingested Documents</div>
+        <button class="btn btn-secondary" onclick="loadDocs()" style="margin-bottom:16px;font-size:13px;padding:8px 14px">🔄 Refresh</button>
+        <table class="table">
+          <thead><tr><th>Filename</th><th>Type</th><th>Chunks</th><th>Ingested</th></tr></thead>
+          <tbody id="docs-table"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:24px">Connect server to load documents</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HEALTH -->
+    <div id="view-health" style="display:none">
+      <div class="panel" style="max-width:500px">
+        <div class="panel-title">💚 Service Health</div>
+        <div id="health-list">
+          <div class="health-row"><div class="health-name">⚡ Qdrant</div><span class="health-badge err" id="h-qdrant">checking…</span><span class="health-latency" id="h-qdrant-lat"></span></div>
+          <div class="health-row"><div class="health-name">🔴 Redis</div><span class="health-badge err" id="h-redis">checking…</span><span class="health-latency" id="h-redis-lat"></span></div>
+          <div class="health-row"><div class="health-name">🐘 PostgreSQL</div><span class="health-badge err" id="h-postgres">checking…</span><span class="health-latency" id="h-postgres-lat"></span></div>
+        </div>
+        <button class="btn btn-secondary" onclick="checkHealth()" style="margin-top:20px;font-size:13px;padding:8px 14px">🔄 Check Now</button>
+        <div style="margin-top:16px;font-size:12px;color:var(--muted)">Requires server at <code style="color:var(--accent)">http://localhost:8000</code></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+const BASE = 'http://localhost:8000';
+
+function show(view) {
+  ['dashboard','query','ingest','documents','health'].forEach(v => {
+    document.getElementById('view-'+v).style.display = v === view ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', ['dashboard','query','ingest','documents','health'][i] === view);
+  });
+  document.getElementById('page-title').textContent = {
+    dashboard:'Dashboard', query:'Query', ingest:'Ingest',
+    documents:'Documents', health:'Service Health'
+  }[view];
+  if (view === 'health') checkHealth();
+  if (view === 'documents') loadDocs();
+}
+
+// Animate bars on load
+setTimeout(() => {
+  document.querySelectorAll('.bar').forEach(b => {
+    b.style.height = b.dataset.h + '%';
+  });
+}, 300);
+
+// Ping API
+async function pingApi() {
+  try {
+    const r = await fetch(BASE + '/', {signal: AbortSignal.timeout(2000)});
+    if (r.ok) document.getElementById('api-badge').innerHTML = '✅ Server online';
+    document.getElementById('api-badge').className = 'badge ok';
+  } catch { }
+}
+pingApi();
+setInterval(pingApi, 5000);
+
+// Query
+async function runQuery() {
+  const q = document.getElementById('q-input').value.trim();
+  if (!q) return;
+  const topK = document.getElementById('q-topk').value;
+  document.getElementById('q-btn-text').textContent = 'Thinking…';
+  document.getElementById('q-spinner').style.display = 'inline-block';
+  document.getElementById('q-answer').className = 'answer-box';
+  document.getElementById('q-answer').textContent = 'Generating answer…';
+  document.getElementById('q-sources').innerHTML = '';
+  document.getElementById('q-meta').textContent = '';
+  try {
+    const r = await fetch(BASE + '/query', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({question: q, top_k: parseInt(topK)})
+    });
+    const d = await r.json();
+    document.getElementById('q-answer').className = 'answer-box has-answer';
+    document.getElementById('q-answer').textContent = d.answer || d.detail || 'No answer returned.';
+    if (d.sources && d.sources.length) {
+      document.getElementById('q-sources').innerHTML = d.sources.map(s =>
+        `<span class="source-chip">📄 ${s.metadata.filename} [chunk ${s.metadata.chunk_index}] score:${s.score.toFixed(2)}</span>`
+      ).join('');
+    }
+    document.getElementById('q-meta').textContent = `Model: ${d.model_used} | Tokens: ${d.token_count} | Latency: ${d.latency_ms}ms | HyDE: ${d.hyde_used}`;
+  } catch(e) {
+    document.getElementById('q-answer').textContent = '❌ Could not reach server. Start: uvicorn app.main:app --reload --port 8000';
+  }
+  document.getElementById('q-btn-text').textContent = 'Ask ⚡';
+  document.getElementById('q-spinner').style.display = 'none';
+}
+
+// Ingest file
+function handleDrop(e) {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) ingestFile(f);
+}
+async function ingestFile(file) {
+  if (!file) return;
+  const st = document.getElementById('ingest-status');
+  st.textContent = `⏳ Ingesting ${file.name}…`;
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(BASE + '/ingest', {method:'POST', body:fd});
+    const d = await r.json();
+    if (d.skipped) st.textContent = `⚠️ Duplicate: ${d.filename} already ingested.`;
+    else st.textContent = `✅ Ingested: ${d.filename} → ${d.chunk_count} chunks (${d.latency_ms}ms)`;
+    st.style.color = 'var(--green)';
+  } catch(e) {
+    st.textContent = '❌ Server not running. Start it first.';
+    st.style.color = 'var(--red)';
+  }
+}
+async function ingestUrl() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+  const st = document.getElementById('ingest-status');
+  st.textContent = `⏳ Fetching ${url}…`;
+  try {
+    const fd = new FormData();
+    fd.append('file_url', url);
+    const r = await fetch(BASE + '/ingest', {method:'POST', body:fd});
+    const d = await r.json();
+    st.textContent = `✅ Ingested URL → ${d.chunk_count} chunks`;
+    st.style.color = 'var(--green)';
+  } catch(e) {
+    st.textContent = '❌ Server not running.';
+    st.style.color = 'var(--red)';
+  }
+}
+
+// Documents
+async function loadDocs() {
+  const tb = document.getElementById('docs-table');
+  try {
+    const r = await fetch(BASE + '/documents');
+    const d = await r.json();
+    if (!d.documents || !d.documents.length) {
+      tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:24px">No documents ingested yet.</td></tr>';
+      return;
+    }
+    tb.innerHTML = d.documents.map(doc => `
+      <tr>
+        <td>${doc.filename}</td>
+        <td><span class="file-badge ${doc.file_type||'pdf'}">${doc.file_type||'—'}</span></td>
+        <td>${doc.chunk_count}</td>
+        <td>${new Date(doc.created_at).toLocaleDateString()}</td>
+      </tr>`).join('');
+  } catch {
+    tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:24px">Server offline</td></tr>';
+  }
+}
+
+// Health
+async function checkHealth() {
+  const set = (id, status, lat) => {
+    const el = document.getElementById(id);
+    el.textContent = status === 'ok' ? '✅ ok' : '❌ error';
+    el.className = 'health-badge ' + (status === 'ok' ? 'ok' : 'err');
+    if (lat !== undefined) document.getElementById(id+'-lat').textContent = lat + 'ms';
+  };
+  try {
+    const r = await fetch(BASE + '/health', {signal: AbortSignal.timeout(5000)});
+    const d = await r.json();
+    const sv = d.services || {};
+    set('h-qdrant',   (sv.qdrant||{}).status||'error',   (sv.qdrant||{}).latency_ms);
+    set('h-redis',    (sv.redis||{}).status||'error',    (sv.redis||{}).latency_ms);
+    set('h-postgres', (sv.postgres||{}).status||'error', (sv.postgres||{}).latency_ms);
+  } catch {
+    ['h-qdrant','h-redis','h-postgres'].forEach(id => set(id, 'error'));
+  }
+}
+</script>
+</body>
+</html>

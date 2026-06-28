@@ -1,0 +1,176 @@
+{
+  "name": "AutoRAG — Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "d4e5f6a7-0001-0001-0001-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely extract error details — structure varies by n8n version\nconst execution = $input.item.json.execution || {};\nconst error = execution.error || {};\nconst workflow = $input.item.json.workflow || {};\n\n// Build a readable stack trace excerpt\nconst stack = (error.stack || '').split('\\n').slice(0, 5).join('\\n');\n\n// Classify error severity\nlet severity = '🔴 CRITICAL';\nconst errMsg = (error.message || '').toLowerCase();\nif (errMsg.includes('timeout')) severity = '🟡 TIMEOUT';\nelse if (errMsg.includes('rate limit') || errMsg.includes('429')) severity = '🟠 RATE LIMIT';\nelse if (errMsg.includes('connection')) severity = '🔴 CONNECTION';\nelse if (errMsg.includes('auth') || errMsg.includes('401') || errMsg.includes('403')) severity = '🔴 AUTH ERROR';\n\nreturn [{\n  json: {\n    workflow_name: workflow.name || 'Unknown Workflow',\n    workflow_id: workflow.id || 'unknown',\n    execution_id: execution.id || $execution?.id || 'unknown',\n    error_message: error.message || 'No error message available',\n    error_node: (error.node?.name) || (error.nodeName) || 'Unknown Node',\n    error_type: error.name || 'Error',\n    stack_excerpt: stack,\n    severity: severity,\n    occurred_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "d4e5f6a7-0002-0002-0002-000000000002",
+      "name": "Extract Error Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#ops-alerts",
+          "mode": "name"
+        },
+        "blocksUi": {
+          "blocksValues": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "🚨 AutoRAG Workflow Error"
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "=*Workflow:*\n{{ $json.workflow_name }}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "=*Severity:*\n{{ $json.severity }}"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "=*Failed Node:*\n`{{ $json.error_node }}`"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "=*Error Type:*\n`{{ $json.error_type }}`"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "=*Error Message:*\n```{{ $json.error_message }}```"
+              }
+            },
+            {
+              "type": "context",
+              "elements": [
+                {
+                  "type": "mrkdwn",
+                  "text": "=🕐 {{ $json.occurred_at }} | Execution: `{{ $json.execution_id }}` | <https://app.n8n.cloud/workflow/{{ $json.workflow_id }}|View Workflow →>"
+                }
+              ]
+            }
+          ]
+        },
+        "otherOptions": { "mrkdwn": true }
+      },
+      "id": "d4e5f6a7-0003-0003-0003-000000000003",
+      "name": "Slack — Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [480, 260],
+      "credentials": {
+        "slackApi": { "id": "3", "name": "Slack AutoRAG" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "CRITICAL",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "AUTH",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "CONNECTION",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-0004-0004-0004-000000000004",
+      "name": "Is Critical Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 540]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#ops-alerts",
+          "mode": "name"
+        },
+        "text": "=🔔 <@here> *CRITICAL ERROR — immediate attention required!*\nWorkflow `{{ $json.workflow_name }}` has failed with a critical error.\nError: `{{ $json.error_message }}`\nPlease check the n8n dashboard and the Railway logs immediately.",
+        "otherOptions": { "mrkdwn": true }
+      },
+      "id": "d4e5f6a7-0005-0005-0005-000000000005",
+      "name": "Slack — Critical Escalation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [720, 440],
+      "credentials": {
+        "slackApi": { "id": "3", "name": "Slack AutoRAG" }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Extract Error Details", "type": "main", "index": 0 }]]
+    },
+    "Extract Error Details": {
+      "main": [
+        [
+          { "node": "Slack — Error Alert", "type": "main", "index": 0 },
+          { "node": "Is Critical Error?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Is Critical Error?": {
+      "main": [
+        [{ "node": "Slack — Critical Escalation", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [{ "name": "autorag" }, { "name": "error-handler" }, { "name": "ops" }],
+  "triggerCount": 1,
+  "updatedAt": "2026-06-24T17:30:00.000Z",
+  "versionId": "1"
+}

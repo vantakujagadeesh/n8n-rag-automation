@@ -1,0 +1,381 @@
+{
+  "name": "AutoRAG — Document Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_DRIVE_FOLDER_ID }}",
+          "mode": "id"
+        },
+        "event": ["fileCreated", "fileUpdated"],
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Google Drive Trigger",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [0, 200],
+      "credentials": {
+        "googleDriveOAuth2Api": { "id": "1", "name": "Google Drive AutoRAG" }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyX", "value": 5, "unit": "minutes" }]
+        },
+        "filters": {
+          "readStatus": "unread",
+          "attachments": true
+        },
+        "options": {
+          "attachmentsBinaryProperties": "attachment_0"
+        }
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [0, 400],
+      "credentials": {
+        "gmailOAuth2": { "id": "2", "name": "Gmail AutoRAG" }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 600],
+      "webhookId": "autorag-ingest-trigger"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"accepted\", \"message\": \"Ingestion queued\" }",
+        "options": { "responseCode": 200 }
+      },
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [240, 600]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "output": "all"
+      },
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "Merge Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "or",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "pdf",
+                    "operator": { "type": "string", "operation": "contains" }
+                  },
+                  {
+                    "leftValue": "={{ $json.fileName || $json.filename || '' }}",
+                    "rightValue": ".pdf",
+                    "operator": { "type": "string", "operation": "endsWith" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "or",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "docx",
+                    "operator": { "type": "string", "operation": "contains" }
+                  },
+                  {
+                    "leftValue": "={{ $json.fileName || $json.filename || '' }}",
+                    "rightValue": ".docx",
+                    "operator": { "type": "string", "operation": "endsWith" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "DOCX"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_url }}",
+                    "rightValue": "",
+                    "operator": { "type": "string", "operation": "isNotEmpty" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "URL"
+            }
+          ]
+        },
+        "fallbackOutput": "extra",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "Route by File Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://autorag-production.up.railway.app/ingest",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ $binary.data }}",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "filename",
+              "value": "={{ $json.fileName || $json.filename || $json.name }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "fullResponse": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "a1b2c3d4-0007-0007-0007-000000000007",
+      "name": "Ingest PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://autorag-production.up.railway.app/ingest",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ $binary.data }}",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "filename",
+              "value": "={{ $json.fileName || $json.filename || $json.name }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "fullResponse": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "a1b2c3d4-0008-0008-0008-000000000008",
+      "name": "Ingest DOCX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://autorag-production.up.railway.app/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filename\": \"{{ $json.filename }}\",\n  \"file_url\": \"{{ $json.file_url }}\",\n  \"file_type\": \"url\"\n}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "fullResponse": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "a1b2c3d4-0009-0009-0009-000000000009",
+      "name": "Ingest URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": { "type": "number", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ $json.body.skipped }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#docs-updates",
+          "mode": "name"
+        },
+        "text": "✅ *Document Ingested*\n📄 File: {{ $json.body.filename }}\n🔢 Chunks: {{ $json.body.chunk_count }}\n⏱ Time: {{ $json.body.latency_ms }}ms\n🆔 ID: {{ $json.body.doc_id }}",
+        "otherOptions": { "mrkdwn": true }
+      },
+      "id": "a1b2c3d4-0011-0011-0011-000000000011",
+      "name": "Slack — Success",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1440, 280],
+      "credentials": {
+        "slackApi": { "id": "3", "name": "Slack AutoRAG" }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#docs-updates",
+          "mode": "name"
+        },
+        "text": "⚠️ *Duplicate Skipped*\n📄 File: {{ $json.body.filename }} was already ingested.",
+        "otherOptions": { "mrkdwn": true }
+      },
+      "id": "a1b2c3d4-0012-0012-0012-000000000012",
+      "name": "Slack — Duplicate",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1440, 520],
+      "credentials": {
+        "slackApi": { "id": "3", "name": "Slack AutoRAG" }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#ops-alerts",
+          "mode": "name"
+        },
+        "text": "❌ *Ingest Failed*\n📄 File: {{ $json.body.filename || $json.fileName || 'unknown' }}\n💥 Error: {{ $json.body.detail || $json.message || 'Unknown error' }}\n🕐 Time: {{ $now }}",
+        "otherOptions": { "mrkdwn": true }
+      },
+      "id": "a1b2c3d4-0013-0013-0013-000000000013",
+      "name": "Slack — Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1440, 700],
+      "credentials": {
+        "slackApi": { "id": "3", "name": "Slack AutoRAG" }
+      }
+    }
+  ],
+  "connections": {
+    "Google Drive Trigger": {
+      "main": [[{ "node": "Merge Sources", "type": "main", "index": 0 }]]
+    },
+    "Gmail Trigger": {
+      "main": [[{ "node": "Merge Sources", "type": "main", "index": 1 }]]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          { "node": "Webhook Response", "type": "main", "index": 0 },
+          { "node": "Merge Sources", "type": "main", "index": 2 }
+        ]
+      ]
+    },
+    "Merge Sources": {
+      "main": [[{ "node": "Route by File Type", "type": "main", "index": 0 }]]
+    },
+    "Route by File Type": {
+      "main": [
+        [{ "node": "Ingest PDF", "type": "main", "index": 0 }],
+        [{ "node": "Ingest DOCX", "type": "main", "index": 0 }],
+        [{ "node": "Ingest URL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ingest PDF": {
+      "main": [[{ "node": "Check Success", "type": "main", "index": 0 }]]
+    },
+    "Ingest DOCX": {
+      "main": [[{ "node": "Check Success", "type": "main", "index": 0 }]]
+    },
+    "Ingest URL": {
+      "main": [[{ "node": "Check Success", "type": "main", "index": 0 }]]
+    },
+    "Check Success": {
+      "main": [
+        [{ "node": "Slack — Success", "type": "main", "index": 0 }],
+        [{ "node": "Slack — Duplicate", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "AutoRAG — Error Handler"
+  },
+  "staticData": null,
+  "tags": [{ "name": "autorag" }, { "name": "ingestion" }],
+  "triggerCount": 3,
+  "updatedAt": "2026-06-24T17:30:00.000Z",
+  "versionId": "1"
+}
